@@ -1,2 +1,3 @@
-# c64-game-organizer
-Python utility to organize Commodore 64 games from zipped archives into Genre/SubGenre/Language folder structure with NFO metadata parsing and disk file renaming
+# GameBase64 Reorganizer
+
+A Python utility to organize Commodore 64 games into a Genre/Language folder structure based on metadata from VERSION.NFO files.
