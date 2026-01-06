@@ -21,12 +21,12 @@ if ($null -eq $pyinstaller) {
 
 # Build the executable
 Write-Host "`nBuilding executable..." -ForegroundColor Yellow
-python -m PyInstaller --onefile --name C64GameOrganizer gb64_reorganizer.py
+python -m PyInstaller --onefile --name GB64GameOrganizer gb64_reorganizer.py
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`n" -ForegroundColor Green
     Write-Host "Build successful!" -ForegroundColor Green
-    Write-Host "Executable location: .\dist\C64GameOrganizer.exe" -ForegroundColor Cyan
+    Write-Host "Executable location: .\dist\GB64GameOrganizer.exe" -ForegroundColor Cyan
 } else {
     Write-Host "`nBuild failed" -ForegroundColor Red
     exit 1
