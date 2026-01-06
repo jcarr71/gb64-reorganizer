@@ -21,17 +21,43 @@ A Python utility to organize Commodore 64 games from zip archives into a structu
 
 ## Installation
 
+### Option 1: Run from Python
+
 1. Clone or download this repository
 2. Ensure Python 3.6+ is installed on your system
 3. Have your GameBase64 games library ready (this tool organizes games from it)
+4. Run: `python gb64_reorganizer.py`
+
+### Option 2: Use the Executable
+
+Download the pre-built executable from the [Releases](../../releases) page and run it directly—no Python installation needed!
+
+## Building the Executable
+
+If you want to build your own executable:
+
+1. Install PyInstaller: `pip install pyinstaller`
+2. Run the build script: `./build.ps1` (Windows PowerShell)
+3. The executable will be created in the `dist/` folder
+
+Or build manually:
+```bash
+pyinstaller --onefile --windowed --name C64GameOrganizer gb64_reorganizer.py
+```
 
 ## Usage
 
-Run the application from the command line:
+### From Command Line (Python)
 
 ```bash
 python gb64_reorganizer.py
 ```
+
+### From Executable
+
+Simply double-click `C64GameOrganizer.exe` in the `dist/` folder.
+
+### Input Prompts
 
 The program will prompt you for:
 
