@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-C64 Game Organizer
+Gamebase Game Organizer
 
-A utility to organize Commodore 64 games from zipped archives into a
-structured folder hierarchy based on Genre, SubGenre, and Language metadata
+A utility to organize games from various gamebases (Commodore 64, Amiga, etc.)
+from zipped archives into a structured folder hierarchy based on metadata
 extracted from VERSION.NFO files.
 
 Author: Jason Carr
@@ -18,12 +18,12 @@ import re
 from typing import Optional, Dict
 
 
-class C64GameOrganizer:
+class GamebaseOrganizer:
     """
-    Organizes Commodore 64 games from zip archives into a structured folder hierarchy.
+    Organizes games from zipped archives into a structured folder hierarchy.
     
-    Extracts games from zip files, parses VERSION.NFO metadata, and creates a folder
-    structure: Destination/PrimaryGenre/SecondaryGenre/Language/GameName/
+    Extracts games from zip files and creates folder structure:
+    Destination/PrimaryGenre/SecondaryGenre/Language/GameName/
     
     Handles:
     - Zip file extraction to temporary directories
@@ -39,7 +39,7 @@ class C64GameOrganizer:
         Initialize the organizer with source and destination directories.
         
         Args:
-            source_dir: Directory containing zip files of C64 games
+            source_dir: Directory containing zip files of games
             destination_dir: Root directory where organized games will be placed
         """
         self.source_root = Path(source_dir)
@@ -67,23 +67,47 @@ class C64GameOrganizer:
             self.errors.append(f"Failed to extract {zip_path.name}: {str(e)}")
             return None
     
-    def parse_version_nfo(self, nfo_path: Path) -> Optional[Dict[str, str]]:
+    def parse_version_nfo(self, nfo_path: Path) -> Optional[Dict[str, str | None]]:
         """
         Parse VERSION.NFO file and extract game metadata.
         
-        Extracts: Name, Genre (primary/secondary), Language
+        Extracts: Name, Genre (primary/secondary), Language, Published, Players, Control, Pal/NTSC
         Genre format: "Primary - Secondary" (splits on dash)
+        Published format: "YEAR Publisher" (splits on space)
         
         Args:
             nfo_path: Path to VERSION.NFO file
             
         Returns:
-            Dictionary with keys: 'name', 'primary_genre', 'secondary_genre', 'language'
+            Dictionary with keys: 'name', 'primary_genre', 'secondary_genre', 'language', 
+                                 'published_year', 'publisher', 'players', 'control', 'pal_ntsc'
             Returns None if parsing fails
         """
         try:
-            with open(nfo_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
+            # Try multiple encodings without replacement first, then with replacement
+            content = None
+            
+            # First pass: strict mode (no error replacement)
+            for encoding in ['utf-8-sig', 'cp1252', 'latin-1']:
+                try:
+                    with open(nfo_path, 'r', encoding=encoding, errors='strict') as f:
+                        content = f.read()
+                    break
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
+            
+            # Second pass: if strict failed, try with replacement
+            if not content:
+                for encoding in ['utf-8-sig', 'cp1252', 'latin-1']:
+                    try:
+                        with open(nfo_path, 'r', encoding=encoding, errors='replace') as f:
+                            content = f.read()
+                        break
+                    except (UnicodeDecodeError, UnicodeError):
+                        continue
+            
+            if not content:
+                return None
             
             # Find GAME INFO section
             game_info_match = re.search(r'GAME INFO(.*?)(?:GAME HISTORY|$)', content, re.DOTALL)
@@ -119,15 +143,100 @@ class C64GameOrganizer:
             lang_match = re.search(r'Language:\s*(.+?)$', content, re.MULTILINE)
             language = lang_match.group(1).strip() if lang_match else '(No Text)'
             
+            # Extract Published field (format: "YEAR Publisher" or "YEAR Publisher Developer")
+            published_year = 'Unknown'
+            publisher = 'Unknown'
+            pub_match = re.search(r'Published:\s*(.+?)$', content, re.MULTILINE)
+            if pub_match:
+                pub_text = pub_match.group(1).strip()
+                # Split on first space to separate year from publisher
+                parts = pub_text.split(None, 1)
+                if len(parts) >= 1:
+                    # Check if first part looks like a year (4 chars, digits and optional ?, like 198?)
+                    first_part = parts[0]
+                    if len(first_part) == 4 and all(c.isdigit() or c == '?' for c in first_part):
+                        published_year = first_part
+                        if len(parts) > 1:
+                            publisher = parts[1]
+                    else:
+                        # If not a year, treat whole thing as publisher
+                        publisher = pub_text
+            
+            # Extract Players field
+            players = 'Unknown'
+            players_match = re.search(r'Players:\s*(.+?)$', content, re.MULTILINE)
+            if players_match:
+                players = players_match.group(1).strip()
+            
+            # Extract Control field
+            control = 'Unknown'
+            control_match = re.search(r'Control:\s*(.+?)$', content, re.MULTILINE)
+            if control_match:
+                control = control_match.group(1).strip()
+            
+            # Extract Pal/NTSC field
+            pal_ntsc = 'Unknown'
+            pal_match = re.search(r'Pal/NTSC:\s*(.+?)$', content, re.MULTILINE)
+            if pal_match:
+                pal_ntsc = pal_match.group(1).strip()
+            
+            # Extract Unique-ID field
+            unique_id = None
+            id_match = re.search(r'Unique-ID:\s*(.+?)$', game_info, re.MULTILINE)
+            if id_match:
+                unique_id = id_match.group(1).strip()
+            
+            # Extract Developer field
+            developer = None
+            dev_match = re.search(r'Developer:\s*(.+?)$', game_info, re.MULTILINE)
+            if dev_match:
+                developer = dev_match.group(1).strip()
+            
+            # Extract Coding field
+            coding = None
+            coding_match = re.search(r'Coding:\s*(.+?)$', game_info, re.MULTILINE)
+            if coding_match:
+                coding = coding_match.group(1).strip()
+            
+            # Extract Graphics field
+            graphics = None
+            graphics_match = re.search(r'Graphics:\s*(.+?)$', game_info, re.MULTILINE)
+            if graphics_match:
+                graphics = graphics_match.group(1).strip()
+            
+            # Extract Music field
+            music = None
+            music_match = re.search(r'Music:\s*(.+?)$', game_info, re.MULTILINE)
+            if music_match:
+                music = music_match.group(1).strip()
+            
+            # Extract Comment field from GAME INFO section
+            comment = None
+            comment_match = re.search(r'Comment:\s*(.+?)$', game_info, re.MULTILINE)
+            if comment_match:
+                comment = comment_match.group(1).strip()
+            
             return {
                 'name': name,
                 'primary_genre': primary_genre,
                 'secondary_genre': secondary_genre,
-                'language': language
+                'language': language,
+                'published_year': published_year,
+                'publisher': publisher,
+                'players': players,
+                'control': control,
+                'pal_ntsc': pal_ntsc,
+                'unique_id': unique_id,
+                'developer': developer,
+                'coding': coding,
+                'graphics': graphics,
+                'music': music,
+                'comment': comment
             }
         except Exception as e:
             self.errors.append(f"Failed to parse {nfo_path.name}: {str(e)}")
             return None
+    
     
     def find_version_nfo(self, folder: Path) -> Optional[Path]:
         """
@@ -176,6 +285,52 @@ class C64GameOrganizer:
             if new_path != file:
                 file.rename(new_path)
     
+    def build_destination_path(self, template: str, metadata: Dict[str, str | None], 
+                               zip_path: Path, root: Path) -> Path:
+        """
+        Build destination path from template and metadata.
+        
+        Template can use placeholders like:
+        {name}, {primary_genre}, {secondary_genre}, {language}, {published_year}, 
+        {publisher}, {players}, {control}, {pal_ntsc}, {developer}, {coding}, 
+        {graphics}, {music}, {comment}, {unique_id}
+        
+        Example: "{primary_genre}/{secondary_genre}/{language}/{name}"
+        
+        Args:
+            template: Path template with placeholders
+            metadata: Parsed metadata dictionary
+            zip_path: Original zip file path
+            root: Root destination directory
+            
+        Returns:
+            Full Path object for the destination
+        """
+        # Build substitution dict with all metadata fields, sanitized
+        subs = {
+            'name': self.sanitize_folder_name(metadata.get('name') or zip_path.stem),
+            'primary_genre': self.sanitize_folder_name(metadata.get('primary_genre') or 'Unknown'),
+            'secondary_genre': self.sanitize_folder_name(metadata.get('secondary_genre') or 'Other'),
+            'language': self.sanitize_folder_name(metadata.get('language') or 'Unknown'),
+            'published_year': metadata.get('published_year') or 'Unknown',
+            'publisher': self.sanitize_folder_name(metadata.get('publisher') or 'Unknown'),
+            'players': self.sanitize_folder_name(metadata.get('players') or 'Unknown'),
+            'control': self.sanitize_folder_name(metadata.get('control') or 'Unknown'),
+            'pal_ntsc': self.sanitize_folder_name(metadata.get('pal_ntsc') or 'Unknown'),
+            'developer': self.sanitize_folder_name(metadata.get('developer') or 'Unknown'),
+            'coding': self.sanitize_folder_name(metadata.get('coding') or 'Unknown'),
+            'graphics': self.sanitize_folder_name(metadata.get('graphics') or 'Unknown'),
+            'music': self.sanitize_folder_name(metadata.get('music') or 'Unknown'),
+            'comment': self.sanitize_folder_name(metadata.get('comment') or 'Unknown'),
+            'unique_id': metadata.get('unique_id') or 'Unknown',
+        }
+        
+        # Replace placeholders in template
+        path_str = template.format(**subs)
+        
+        # Build full path
+        return root / path_str
+    
     def sanitize_folder_name(self, name: str) -> str:
         """
         Remove invalid Windows filename characters.
@@ -195,7 +350,7 @@ class C64GameOrganizer:
         
         return sanitized
     
-    def organize_games(self, move_files: bool = False) -> None:
+    def organize_games(self, move_files: bool = False, folder_template: str = "{primary_genre}/{secondary_genre}/{language}/{name}") -> None:
         """
         Scan source directory and organize games into destination structure.
         
@@ -203,6 +358,7 @@ class C64GameOrganizer:
         
         Args:
             move_files: If True, move files. If False, copy files (safer for testing)
+            folder_template: Template for folder structure using placeholders like {name}, {primary_genre}, etc.
         """
         if not self.source_root.exists():
             print(f"Error: Source directory '{self.source_root}' does not exist")
@@ -228,7 +384,7 @@ class C64GameOrganizer:
         for zip_file in self.source_root.rglob('*.zip'):
             zip_count += 1
             self.games_found += 1
-            self._process_zip_file(zip_file, move_files)
+            self._process_zip_file(zip_file, move_files, folder_template)
         
         # Print summary
         print("-" * 60)
@@ -253,7 +409,7 @@ class C64GameOrganizer:
         log_file.close()
         print(f"\nLog file saved to: {log_file_path}")
     
-    def _process_zip_file(self, zip_path: Path, move_files: bool) -> None:
+    def _process_zip_file(self, zip_path: Path, move_files: bool, folder_template: str) -> None:
         """
         Process a zipped game file.
         
@@ -262,6 +418,7 @@ class C64GameOrganizer:
         Args:
             zip_path: Path to zip file
             move_files: Whether to move or copy files
+            folder_template: Template for destination folder structure
         """
         # Extract zip to temporary location
         temp_dir = self.extract_zip_to_temp(zip_path)
@@ -284,36 +441,33 @@ class C64GameOrganizer:
                 self.errors.append(f"Could not parse metadata for {zip_path.name}")
                 return
             
-            # Get game name from NFO and sanitize folder names
-            game_name = self.sanitize_folder_name(metadata.get('name', zip_path.stem))
-            primary_genre = self.sanitize_folder_name(metadata['primary_genre'])
-            secondary_genre = self.sanitize_folder_name(metadata['secondary_genre'])
-            language = self.sanitize_folder_name(metadata['language'])
-            
             # Get the actual game folder (parent of VERSION.NFO)
             game_folder = nfo_file.parent
             
             # Rename disk files in the game folder
+            game_name = self.sanitize_folder_name(metadata.get('name') or zip_path.stem)
             self.rename_disk_files(game_folder, game_name)
             
-            # Create destination path
-            dest_path = self.destination_root / primary_genre / secondary_genre / language / game_name
+            # Create destination path using template
+            dest_path = self.build_destination_path(folder_template, metadata, zip_path, self.destination_root)
+            
+            # Add game name as an additional subfolder to store the game files
+            final_dest = dest_path / game_name
             
             # Check if destination already exists - if so, add version number
             version = 2
-            original_dest = dest_path
-            while dest_path.exists():
+            while final_dest.exists():
                 versioned_name = f"{game_name} [v{version}]"
-                dest_path = self.destination_root / primary_genre / secondary_genre / language / versioned_name
+                final_dest = dest_path / versioned_name
                 version += 1
             
             # Create destination directory and copy the game folder
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(game_folder, dest_path)
+            final_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(game_folder, final_dest)
             
             self.games_moved += 1
             print(f"✓ EXTRACTED: {zip_path.name}")
-            print(f"  → {primary_genre} / {secondary_genre} / {language} / {game_name}")
+            print(f"  → {final_dest.relative_to(self.destination_root)}")
         
         finally:
             # Clean up temporary directory
@@ -323,13 +477,13 @@ class C64GameOrganizer:
 
 def main():
     """
-    Main entry point for the C64 Game Organizer.
+    Main entry point for the Gamebase Game Organizer.
     
     Prompts user for source and destination directories,
-    then organizes all C64 games in those directories.
+    then organizes all games in those directories.
     """
     print("\n" + "=" * 60)
-    print("C64 GAME ORGANIZER")
+    print("GAMEBASE GAME ORGANIZER")
     print("=" * 60)
     
     # Get directories from user
@@ -341,7 +495,7 @@ def main():
         return
     
     # Create organizer and process games
-    organizer = C64GameOrganizer(source, destination)
+    organizer = GamebaseOrganizer(source, destination)
     organizer.organize_games(move_files=False)
 
 

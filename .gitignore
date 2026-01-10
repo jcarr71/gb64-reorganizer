@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+ENV/
+
+# PyInstaller
+build/
+dist/
+*.manifest
+*.spec
+
+# Cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+organization_log.txt
+*.log
+RELEASE-INSTRUCTIONS.ps1
+create-release.ps1
