@@ -15,6 +15,7 @@ import shutil
 import zipfile
 import tempfile
 import re
+import argparse
 from typing import Optional, Dict
 
 
@@ -353,6 +354,9 @@ class GamebaseOrganizer:
         # Replace backslash and forward slash with dash (to prevent path injection)
         sanitized = re.sub(r'[\\/]', '-', name)
         
+        # Remove square brackets (common in publisher names)
+        sanitized = re.sub(r'[\[\]]', '', sanitized)
+        
         # Remove other invalid Windows characters
         invalid_chars = r'[<>:"|?*]'
         sanitized = re.sub(invalid_chars, '', sanitized)
@@ -362,7 +366,7 @@ class GamebaseOrganizer:
         
         return sanitized
     
-    def organize_games(self, move_files: bool = False, folder_template: str = "{primary_genre}/{secondary_genre}/{language}/{name}") -> None:
+    def organize_games(self, move_files: bool = False, folder_template: str = "{primary_genre}/{secondary_genre}/{language}/{name}", english_only: bool = False, include_no_text: bool = False, collapse_publishers: bool = False) -> None:
         """
         Scan source directory and organize games into destination structure.
         
@@ -371,6 +375,9 @@ class GamebaseOrganizer:
         Args:
             move_files: If True, move files. If False, copy files (safer for testing)
             folder_template: Template for folder structure using placeholders like {name}, {primary_genre}, etc.
+            english_only: If True, only process games with 'English' in language field (case-insensitive)
+            include_no_text: If True, include games with '(No Text)' when english_only is True
+            collapse_publishers: If True, remove everything after ' - ' in publisher names
         """
         if not self.source_root.exists():
             print(f"Error: Source directory '{self.source_root}' does not exist")
@@ -396,7 +403,7 @@ class GamebaseOrganizer:
         for zip_file in self.source_root.rglob('*.zip'):
             zip_count += 1
             self.games_found += 1
-            self._process_zip_file(zip_file, move_files, folder_template)
+            self._process_zip_file(zip_file, move_files, folder_template, english_only, include_no_text, collapse_publishers)
         
         # Print summary
         print("-" * 60)
@@ -421,7 +428,7 @@ class GamebaseOrganizer:
         log_file.close()
         print(f"\nLog file saved to: {log_file_path}")
     
-    def _process_zip_file(self, zip_path: Path, move_files: bool, folder_template: str) -> None:
+    def _process_zip_file(self, zip_path: Path, move_files: bool, folder_template: str, english_only: bool = False, include_no_text: bool = False, collapse_publishers: bool = False) -> None:
         """
         Process a zipped game file.
         
@@ -431,6 +438,9 @@ class GamebaseOrganizer:
             zip_path: Path to zip file
             move_files: Whether to move or copy files
             folder_template: Template for destination folder structure
+            english_only: If True, skip games without 'English' in language field (case-insensitive)
+            include_no_text: If True, include games with '(No Text)' when english_only is True
+            collapse_publishers: If True, remove everything after ' - ' in publisher names
         """
         # Extract zip to temporary location
         temp_dir = self.extract_zip_to_temp(zip_path)
@@ -452,6 +462,27 @@ class GamebaseOrganizer:
                 print(f"⚠ SKIP: {zip_path.stem} - Could not parse VERSION.NFO")
                 self.errors.append(f"Could not parse metadata for {zip_path.name}")
                 return
+            
+            # Collapse publisher name if requested (remove everything after / or \)
+            if collapse_publishers and metadata.get('publisher'):
+                publisher = metadata['publisher']
+                # Only check for / and \ (separators in publisher names)
+                for separator in ['/', '\\']:
+                    if separator in publisher:
+                        metadata['publisher'] = publisher.split(separator)[0].strip()
+                        break
+            
+            # Check English-only filter
+            if english_only:
+                language = metadata.get('language', '')
+                # Case-insensitive check for English
+                has_english = 'english' in language.lower()
+                is_no_text = '(no text)' in language.lower()
+                
+                # Skip if not English (unless it's (No Text) and that's allowed)
+                if not has_english and not (include_no_text and is_no_text):
+                    print(f"⚠ SKIP: {zip_path.stem} - Not English (Language: {language})")
+                    return
             
             # Get the actual game folder (parent of VERSION.NFO)
             game_folder = nfo_file.parent
@@ -491,41 +522,107 @@ def main():
     """
     Main entry point for the Gamebase Game Organizer.
     
-    Prompts user for source and destination directories,
-    then organizes all games in those directories.
+    Supports both command-line arguments and interactive prompts.
     """
+    parser = argparse.ArgumentParser(
+        description='GameBase64 Game Organizer - Organize games from zipped archives',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python gb64_reorganizer.py
+    (Interactive mode - prompts for all options)
+  
+  python gb64_reorganizer.py "S:\\Source" "S:\\Dest"
+    (Organize with default settings)
+  
+  python gb64_reorganizer.py "S:\\Source" "S:\\Dest" --template "{publisher}/{name}" --english-only --collapse-publishers
+    (Organize with custom options)
+        """
+    )
+    
+    parser.add_argument('source', nargs='?', help='Source directory containing zipped games')
+    parser.add_argument('destination', nargs='?', help='Destination directory for organized games')
+    parser.add_argument('--template', default='{primary_genre}/{secondary_genre}/{language}/{name}',
+                       help='Folder structure template (default: {primary_genre}/{secondary_genre}/{language}/{name})')
+    parser.add_argument('--english-only', action='store_true',
+                       help='Only process games with English language')
+    parser.add_argument('--include-no-text', action='store_true',
+                       help='Include (No Text) games when using --english-only')
+    parser.add_argument('--collapse-publishers', action='store_true',
+                       help='Remove text after dash in publisher names')
+    
+    args = parser.parse_args()
+    
     print("\n" + "=" * 60)
-    print("GAMEBASE64 GAME ORGANIZER v1.2.0")
+    print("GAMEBASE64 GAME ORGANIZER v1.2.1")
     print("=" * 60)
     
-    # Get directories from user
-    source = input("\nEnter source directory (zipped games): ").strip()
-    destination = input("Enter destination directory (organized output): ").strip()
-    
-    if not source or not destination:
-        print("Error: Both directories are required.")
-        return
-    
-    # Get folder template (optional)
-    print("\nFolder Template (press Enter for default):")
-    print("Available fields: {name}, {primary_genre}, {secondary_genre}, {language},")
-    print("                  {published_year}, {publisher}, {developer}, {players},")
-    print("                  {control}, {pal_ntsc}, {unique_id}, {coding}, {graphics},")
-    print("                  {music}, {comment}")
-    print("\nDefault: {primary_genre}/{secondary_genre}/{language}/{name}")
-    print("Examples:")
-    print("  - {published_year}/{primary_genre}/{name}")
-    print("  - {publisher}/{name}")
-    print("  - {primary_genre}/{language}/{name}")
-    
-    template = input("\nTemplate: ").strip()
-    if not template:
-        template = "{primary_genre}/{secondary_genre}/{language}/{name}"
-        print(f"Using default template: {template}")
+    # Get directories - from args or interactive prompts
+    if args.source and args.destination:
+        source = args.source
+        destination = args.destination
+        template = args.template
+        english_only = args.english_only
+        include_no_text = args.include_no_text
+        collapse_publishers = args.collapse_publishers
+        
+        print(f"\nSource: {source}")
+        print(f"Destination: {destination}")
+        print(f"Template: {template}")
+        if english_only:
+            print(f"English filter: {'English + (No Text)' if include_no_text else 'English only'}")
+        if collapse_publishers:
+            print("Publisher collapse: Enabled")
+    else:
+        # Interactive mode
+        source = input("\nEnter source directory (zipped games): ").strip()
+        destination = input("Enter destination directory (organized output): ").strip()
+        
+        if not source or not destination:
+            print("Error: Both directories are required.")
+            return
+        
+        # Get folder template (optional)
+        print("\nFolder Template (press Enter for default):")
+        print("Available fields: {name}, {primary_genre}, {secondary_genre}, {language},")
+        print("                  {published_year}, {publisher}, {developer}, {players},")
+        print("                  {control}, {pal_ntsc}, {unique_id}, {coding}, {graphics},")
+        print("                  {music}, {comment}")
+        print("\nDefault: {primary_genre}/{secondary_genre}/{language}/{name}")
+        print("Examples:")
+        print("  - {published_year}/{primary_genre}/{name}")
+        print("  - {publisher}/{name}")
+        print("  - {primary_genre}/{language}/{name}")
+        
+        template = input("\nTemplate: ").strip()
+        if not template:
+            template = "{primary_genre}/{secondary_genre}/{language}/{name}"
+            print(f"Using default template: {template}")
+        
+        # Ask about English-only filter
+        english_filter = input("\nOnly process games with English language? (y/n): ").strip().lower()
+        english_only = english_filter == 'y'
+        
+        include_no_text = False
+        if english_only:
+            no_text_filter = input("Include games with '(No Text)' language? (y/n): ").strip().lower()
+            include_no_text = no_text_filter == 'y'
+            
+            if include_no_text:
+                print("Filtering: Only games with 'English' or '(No Text)' in language field will be processed")
+            else:
+                print("Filtering: Only games with 'English' in language field will be processed")
+        
+        # Ask about publisher collapsing
+        collapse_filter = input("\nCollapse publisher names (remove text after ' - ')? (y/n): ").strip().lower()
+        collapse_publishers = collapse_filter == 'y'
+        
+        if collapse_publishers:
+            print("Publisher names will be collapsed (e.g., 'Activision - Games' → 'Activision')")
     
     # Create organizer and process games
     organizer = GamebaseOrganizer(source, destination)
-    organizer.organize_games(move_files=False, folder_template=template)
+    organizer.organize_games(move_files=False, folder_template=template, english_only=english_only, include_no_text=include_no_text, collapse_publishers=collapse_publishers)
 
 
 if __name__ == "__main__":
