@@ -2,40 +2,75 @@
 
 ## Available Versions
 
-### v1.0.0 (Stable - Current Default)
+### v1.2.0 (Stable CLI - **RECOMMENDED**)
 **Status:** Released and tagged on GitHub
+**Component:** CLI only (`gb64_reorganizer.py`)
 **Features:**
-- Core game organizing from zip files
-- VERSION.NFO metadata extraction
-- Fixed folder structure: Genre/SubGenre/Language/GameName
-- Multi-disk game file renaming
-- Copy/Move operations
-
-**Access:** `git checkout v1.0.0`
-
----
-
-### v1.0.1 (Current Development)
-**Status:** Released and tagged on GitHub
-**New Features:**
-- ✨ **Dynamic Template System** - Customize folder structure with placeholders
-- ✨ **15 Metadata Field Placeholders** - Build custom organization schemes:
+- ✅ Core game organizing from zip files
+- ✅ VERSION.NFO metadata extraction (15 fields)
+- ✅ **Dynamic Template System** - Customize folder structure with placeholders
+- ✅ **15 Metadata Field Placeholders:**
   - `{name}`, `{primary_genre}`, `{secondary_genre}`, `{language}`
   - `{published_year}`, `{publisher}`, `{developer}`
   - `{players}`, `{control}`, `{pal_ntsc}`
   - `{unique_id}`, `{coding}`, `{graphics}`, `{music}`, `{comment}`
-- ✨ **Game Name Subfolders** - All game files organized in dedicated folders
-- ✨ **Template Input Field** - GUI field with help dialog showing available placeholders
+- ✅ **Path Sanitization Fix** - Handles slashes in metadata (e.g., "English \ Italian" → "English - Italian")
+- ✅ **Template Validation** - Helpful error messages for typos in field names
+- ✅ Interactive template prompt with examples
+- ✅ Multi-disk game file renaming
+- ✅ Copy/Move operations
 
 **Example Templates:**
 ```
-{primary_genre}/{secondary_genre}/{language}/{name}
+{primary_genre}/{secondary_genre}/{language}/{name}  (default)
 {published_year}/{primary_genre}/{name}
 {publisher}/{name}
-{unique_id}/{name}
+{language}/{publisher}/{primary_genre}/{secondary_genre}
 ```
 
-**Access:** `git checkout v1.0.1` or `git checkout main`
+**Access:** `git checkout v1.2.0`
+
+---
+
+### GUI (Work in Progress - Experimental)
+**Status:** Development/Testing
+**Component:** GUI only (`gb64_gui.py`)
+**⚠️ Warning:** Experimental features, use with caution
+**Experimental Features:**
+- 🧪 Background scanning with progress tracking
+- 🧪 Metadata caching (may have bugs with large collections)
+- 🧪 Cancel operation support
+- 🧪 Game filtering by genre/language/publisher
+- 🧪 Selective organization with checkboxes
+- 🧪 Batch UI updates (every 10 files)
+
+**Known Issues:**
+- Cache may not update correctly for modified files
+- Large collections (30k+ files) not fully tested
+- UI may freeze on very large selections
+
+**Recommendation:** Use v1.2.0 CLI for production use
+
+**Access:** Current `main` branch (not tagged)
+
+---
+
+### v1.0.1 (Previous Release)
+**Status:** Superseded by v1.2.0
+**Features:**
+- Template system (basic version)
+- Path issues with special characters
+
+**Access:** `git checkout v1.0.1`
+
+---
+
+### v1.0.0 (Legacy)
+**Status:** Deprecated
+**Features:**
+- Fixed folder structure only
+
+**Access:** `git checkout v1.0.0`
 
 ---
 

@@ -325,8 +325,17 @@ class GamebaseOrganizer:
             'unique_id': metadata.get('unique_id') or 'Unknown',
         }
         
-        # Replace placeholders in template
-        path_str = template.format(**subs)
+        # Validate template and provide helpful error message
+        try:
+            path_str = template.format(**subs)
+        except KeyError as e:
+            invalid_field = str(e).strip("'")
+            valid_fields = ', '.join(sorted(subs.keys()))
+            raise ValueError(
+                f"Invalid template field: {{{invalid_field}}}\n"
+                f"Valid fields are: {valid_fields}\n"
+                f"Check your template for typos!"
+            ) from e
         
         # Build full path
         return root / path_str
@@ -341,9 +350,12 @@ class GamebaseOrganizer:
         Returns:
             Sanitized folder name
         """
-        # Remove invalid Windows characters
+        # Replace backslash and forward slash with dash (to prevent path injection)
+        sanitized = re.sub(r'[\\/]', '-', name)
+        
+        # Remove other invalid Windows characters
         invalid_chars = r'[<>:"|?*]'
-        sanitized = re.sub(invalid_chars, '', name)
+        sanitized = re.sub(invalid_chars, '', sanitized)
         
         # Strip leading/trailing spaces and dots
         sanitized = sanitized.strip('. ')
@@ -483,7 +495,7 @@ def main():
     then organizes all games in those directories.
     """
     print("\n" + "=" * 60)
-    print("GAMEBASE GAME ORGANIZER")
+    print("GAMEBASE GAME ORGANIZER v1.2.0")
     print("=" * 60)
     
     # Get directories from user
@@ -494,9 +506,26 @@ def main():
         print("Error: Both directories are required.")
         return
     
+    # Get folder template (optional)
+    print("\nFolder Template (press Enter for default):")
+    print("Available fields: {name}, {primary_genre}, {secondary_genre}, {language},")
+    print("                  {published_year}, {publisher}, {developer}, {players},")
+    print("                  {control}, {pal_ntsc}, {unique_id}, {coding}, {graphics},")
+    print("                  {music}, {comment}")
+    print("\nDefault: {primary_genre}/{secondary_genre}/{language}/{name}")
+    print("Examples:")
+    print("  - {published_year}/{primary_genre}/{name}")
+    print("  - {publisher}/{name}")
+    print("  - {primary_genre}/{language}/{name}")
+    
+    template = input("\nTemplate: ").strip()
+    if not template:
+        template = "{primary_genre}/{secondary_genre}/{language}/{name}"
+        print(f"Using default template: {template}")
+    
     # Create organizer and process games
     organizer = GamebaseOrganizer(source, destination)
-    organizer.organize_games(move_files=False)
+    organizer.organize_games(move_files=False, folder_template=template)
 
 
 if __name__ == "__main__":

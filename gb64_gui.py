@@ -13,8 +13,9 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext, font
 import threading
 import queue
 import sys
+import json
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional, List, Dict
 
 from gb64_reorganizer import GamebaseOrganizer
@@ -24,7 +25,8 @@ from gb64_reorganizer import GamebaseOrganizer
 class GameInfo:
     """Container for discovered game information."""
     zip_name: str
-    zip_path: Path
+    zip_path: str  # Changed from Path to str for JSON serialization
+    modification_time: float = 0.0  # File modification timestamp
     name: Optional[str] = None
     primary_genre: Optional[str] = None
     secondary_genre: Optional[str] = None
@@ -42,23 +44,80 @@ class GameInfo:
     comment: Optional[str] = None
     selected: bool = False
     error: Optional[str] = None
+    
+    def to_path(self):
+        """Convert zip_path string back to Path object."""
+        return Path(self.zip_path)
 
 
 class GamebaseGameScannerThread(threading.Thread):
     """Background thread for scanning game archives."""
     
-    def __init__(self, source_dir: Path, output_queue: queue.Queue):
+    def __init__(self, source_dir: Path, output_queue: queue.Queue, use_cache: bool = True):
         super().__init__(daemon=True)
         self.source_dir = source_dir
         self.output_queue = output_queue
+        self.use_cache = use_cache
+        self.stop_flag = threading.Event()
+        self.cache_file = source_dir / '.gamebase_cache.json'
     
     def run(self):
         """Scan directory and parse game metadata."""
         try:
             organizer = GamebaseOrganizer(str(self.source_dir), "")
             
-            for zip_file in sorted(self.source_dir.rglob('*.zip')):
-                game_info = GameInfo(zip_name=zip_file.name, zip_path=zip_file)
+            # Load cache if enabled
+            cache = {}
+            if self.use_cache and self.cache_file.exists():
+                try:
+                    with open(self.cache_file, 'r', encoding='utf-8') as f:
+                        cache_data = json.load(f)
+                        cache = {item['zip_name']: item for item in cache_data}
+                    self.output_queue.put(('log', f"Loaded cache with {len(cache)} entries"))
+                except Exception as e:
+                    self.output_queue.put(('log', f"Cache load failed: {e}"))
+            
+            # Count total files first for progress tracking
+            all_zips = sorted(self.source_dir.rglob('*.zip'))
+            total_count = len(all_zips)
+            self.output_queue.put(('total', total_count))
+            
+            # Determine which files need scanning
+            files_to_scan = []
+            cached_count = 0
+            
+            for zip_file in all_zips:
+                mod_time = zip_file.stat().st_mtime
+                cached_entry = cache.get(zip_file.name)
+                
+                if cached_entry and cached_entry.get('modification_time') == mod_time:
+                    # Use cached data
+                    game_info = GameInfo(**cached_entry)
+                    self.output_queue.put(('game', game_info))
+                    cached_count += 1
+                else:
+                    # Need to scan
+                    files_to_scan.append((zip_file, mod_time))
+            
+            if cached_count > 0:
+                self.output_queue.put(('log', f"Using {cached_count} cached entries, scanning {len(files_to_scan)} new/changed files"))
+            
+            # Scan new/changed files
+            for index, (zip_file, mod_time) in enumerate(files_to_scan, start=1):
+                # Check for cancellation
+                if self.stop_flag.is_set():
+                    self.output_queue.put(('cancelled', None))
+                    return
+                
+                # Send progress update
+                current = cached_count + index
+                self.output_queue.put(('progress', current, total_count))
+                
+                game_info = GameInfo(
+                    zip_name=zip_file.name, 
+                    zip_path=str(zip_file),
+                    modification_time=mod_time
+                )
                 
                 temp_dir = organizer.extract_zip_to_temp(zip_file)
                 if temp_dir:
@@ -97,6 +156,16 @@ class GamebaseGameScannerThread(threading.Thread):
                 
                 self.output_queue.put(('game', game_info))
             
+            # Save cache if enabled
+            if self.use_cache:
+                try:
+                    all_games = []
+                    # Collect all games from queue (cached + newly scanned)
+                    # Note: We'll need to save this from the GUI after collection
+                    self.output_queue.put(('save_cache', self.cache_file))
+                except Exception as e:
+                    self.output_queue.put(('log', f"Cache save failed: {e}"))
+            
             self.output_queue.put(('done', None))
         except Exception as e:
             self.output_queue.put(('error', str(e)))
@@ -116,19 +185,26 @@ class GamebaseOrganizationThread(threading.Thread):
         self.move_files = move_files
         self.keep_zipped = keep_zipped
         self.output_queue = output_queue
+        self.stop_flag = threading.Event()
     
     def run(self):
         """Organize selected games."""
-        count = 0
-        for game in self.games:
-            if not game.selected:
-                continue
+        selected_games = [g for g in self.games if g.selected]
+        total = len(selected_games)
+        
+        for index, game in enumerate(selected_games, start=1):
+            # Check for cancellation
+            if self.stop_flag.is_set():
+                self.output_queue.put(('cancelled', None))
+                return
             
-            count += 1
+            # Send progress update
+            self.output_queue.put(('progress', index, total))
+            
             temp_dir = None
             try:
                 organizer = GamebaseOrganizer(str(self.destination_dir.parent), str(self.destination_dir))
-                temp_dir = organizer.extract_zip_to_temp(game.zip_path)
+                temp_dir = organizer.extract_zip_to_temp(game.to_path())
                 
                 if not temp_dir:
                     self.output_queue.put(('log', f"✗ Failed to extract: {game.zip_name}"))
@@ -148,7 +224,7 @@ class GamebaseOrganizationThread(threading.Thread):
                 dest_path = organizer.build_destination_path(
                     self.folder_template, 
                     metadata, 
-                    game.zip_path, 
+                    game.to_path(), 
                     self.destination_dir
                 )
                 
@@ -157,7 +233,7 @@ class GamebaseOrganizationThread(threading.Thread):
                 if len(contents) == 1 and contents[0].is_dir():
                     game_folder = contents[0]
                 
-                game_name = organizer.sanitize_folder_name(metadata.get('name') or game.zip_path.stem)
+                game_name = organizer.sanitize_folder_name(metadata.get('name') or game.to_path().stem)
                 organizer.rename_disk_files(game_folder, game_name)
                 
                 # Add game name as an additional subfolder to store the game files
@@ -190,13 +266,15 @@ class GamebaseGameOrganizerGUI:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("Gamebase Game Organizer")
+        self.root.title("Gamebase Game Organizer (WIP - Experimental)")
         self.root.geometry("1250x750")
         
         self.source_dir = None
         self.destination_dir = None
         self.games: List[GameInfo] = []
         self.output_queue = queue.Queue()
+        self.scanner_thread = None
+        self.organizer_thread = None
         
         # Filter variables (initialized in _create_widgets)
         self.genre_filter = tk.StringVar(value="")
@@ -383,6 +461,8 @@ class GamebaseGameOrganizerGUI:
         ttk.Checkbutton(bottom, text="Zipped", variable=self.keep_zipped_var).pack(side=tk.LEFT, padx=8)
         
         ttk.Button(bottom, text="Scan", command=self._scan_source, width=8).pack(side=tk.LEFT, padx=2)
+        self.cancel_button = ttk.Button(bottom, text="Cancel", command=self._cancel_operation, width=8, state=tk.DISABLED)
+        self.cancel_button.pack(side=tk.LEFT, padx=2)
         ttk.Button(bottom, text="Select All", command=self._select_all_games, width=10).pack(side=tk.LEFT, padx=2)
         ttk.Button(bottom, text="Deselect All", command=self._deselect_all_games, width=12).pack(side=tk.LEFT, padx=2)
         ttk.Button(bottom, text="Organize", command=self._organize_games, width=10).pack(side=tk.LEFT, padx=2)
@@ -424,36 +504,69 @@ class GamebaseGameOrganizerGUI:
         for item in self.game_tree.get_children():
             self.game_tree.delete(item)
         self.log_text.delete(1.0, tk.END)
+        self.progress['value'] = 0
         
         self._log_message("Scanning...")
         self.progress_label.config(text="Scanning...")
         
-        scanner = GamebaseGameScannerThread(self.source_dir, self.output_queue)
-        scanner.start()
+        self.scanner_thread = GamebaseGameScannerThread(self.source_dir, self.output_queue)
+        self.scanner_thread.start()
+        self.cancel_button.config(state=tk.NORMAL)
     
     def _check_queue(self):
         """Check for messages from background threads."""
+        update_ui = False
+        batch_count = 0
+        
         try:
             while True:
                 msg_type, data = self.output_queue.get_nowait()
                 
-                if msg_type == 'game':
+                if msg_type == 'total':
+                    self._log_message(f"Found {data} zip files to scan...")
+                
+                elif msg_type == 'game':
                     self.games.append(data)
-                    self._update_filters()
-                    self._apply_filters()
+                    batch_count += 1
+                    # Update UI every 10 games to avoid slowdown
+                    if batch_count >= 10:
+                        update_ui = True
+                
+                elif msg_type == 'progress':
+                    current, total = data
+                    progress_pct = int((current / total) * 100)
+                    self.progress['value'] = progress_pct
+                    self.progress_label.config(text=f"Processing {current}/{total} ({progress_pct}%)")
                 
                 elif msg_type == 'log':
                     self._log_message(data)
                 
+                elif msg_type == 'cancelled':
+                    self.progress_label.config(text="Cancelled")
+                    self._log_message("Operation cancelled by user")
+                    self.cancel_button.config(state=tk.DISABLED)
+                    update_ui = True
+                
+                elif msg_type == 'save_cache':
+                    cache_file = data
+                    self._save_cache(cache_file)
+                
                 elif msg_type == 'done':
                     self.progress['value'] = 100
                     self.progress_label.config(text=f"Done - {len(self.games)} games found")
+                    self.cancel_button.config(state=tk.DISABLED)
+                    update_ui = True
                 
                 elif msg_type == 'error':
                     self._log_message(f"ERROR: {data}")
         
         except queue.Empty:
             pass
+        
+        # Batch update filters and UI
+        if update_ui:
+            self._update_filters()
+            self._apply_filters()
         
         self.root.after(100, self._check_queue)
     
@@ -695,7 +808,7 @@ Example Templates:
     def _show_in_explorer(self, game: GameInfo):
         """Open Explorer at zip file."""
         try:
-            zip_path = game.zip_path.resolve()
+            zip_path = game.to_path().resolve()
             if sys.platform == "win32":
                 import subprocess
                 subprocess.Popen(['explorer', '/select,', str(zip_path)])
@@ -717,17 +830,41 @@ Example Templates:
             return
         
         self.log_text.delete(1.0, tk.END)
+        self.progress['value'] = 0
         self._log_message(f"Organizing {len(selected)} game(s)...")
         
-        organizer = GamebaseOrganizationThread(
-            selected,
+        self.organizer_thread = GamebaseOrganizationThread(
+            self.games,
             self.destination_dir,
             self.template_var.get(),
             self.operation_var.get() == "move",
             self.keep_zipped_var.get(),
             self.output_queue
         )
-        organizer.start()
+        self.organizer_thread.start()
+        self.cancel_button.config(state=tk.NORMAL)
+    
+    def _cancel_operation(self):
+        """Cancel currently running operation."""
+        if self.scanner_thread and self.scanner_thread.is_alive():
+            self.scanner_thread.stop_flag.set()
+            self._log_message("Cancelling scan...")
+        
+        if self.organizer_thread and self.organizer_thread.is_alive():
+            self.organizer_thread.stop_flag.set()
+            self._log_message("Cancelling organization...")
+        
+        self.cancel_button.config(state=tk.DISABLED)
+    
+    def _save_cache(self, cache_file: Path):
+        """Save scanned game metadata to cache file."""
+        try:
+            cache_data = [asdict(game) for game in self.games]
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2)
+            self._log_message(f"Saved cache with {len(cache_data)} entries")
+        except Exception as e:
+            self._log_message(f"Cache save error: {e}")
     
     def _log_message(self, msg: str):
         """Add log message."""

@@ -1,21 +1,38 @@
-# GameBase64 Game Organizer
+# GameBase Game Organizer
 
-A Python utility to organize Commodore 64 games from zip archives into a structured folder hierarchy based on metadata extracted from VERSION.NFO files.
+A Python utility to organize retro game collections (Commodore 64, Amiga, etc.) from zip archives into a structured folder hierarchy based on metadata extracted from VERSION.NFO files.
 
-## Features
+## Version Info
 
-- **Automatic Organization**: Extracts games from zip files and organizes them into a clean folder structure
-- **Metadata-Based Sorting**: Extracts metadata from VERSION.NFO files to categorize games by:
-  - Primary Genre
-  - Secondary Genre
-  - Language
-  - Year
-  - Publisher
-- **Customizable Templates**: Define your own folder structure using field placeholders
-- **Smart Disk File Handling**: Automatically detects and renames Commodore 64 disk files (D64, D71, D81, G64, X64, T64, TAP, PRG, P00, LNX)
-- **Duplicate Handling**: Automatically versioning for duplicate game names
-- **Error Reporting**: Detailed logging of skipped games and errors
-- **Modern GUI**: Interactive interface with game preview, filtering, and customizable organization templates
+**Current Stable Release:** v1.2.0 (CLI only)
+**GUI Status:** Work in Progress (Experimental)
+
+👉 **Recommended:** Use the CLI (`gb64_reorganizer.py`) for production use
+
+## Features (CLI - v1.2.0 Stable)
+
+- ✅ **Automatic Organization**: Extracts games from zip files and organizes them into a clean folder structure
+- ✅ **Metadata-Based Sorting**: Extracts metadata from VERSION.NFO files (15+ fields):
+  - Primary Genre, Secondary Genre, Language
+  - Published Year, Publisher, Developer
+  - Players, Control, PAL/NTSC
+  - Unique ID, Coding/Graphics/Music Credits, Comments
+- ✅ **Customizable Templates**: Define your own folder structure using 15 field placeholders
+- ✅ **Path Sanitization**: Handles special characters in metadata (e.g., "English \ Italian")
+- ✅ **Template Validation**: Helpful error messages for typos
+- ✅ **Smart Disk File Handling**: Automatically detects and renames disk files (D64, D71, D81, G64, X64, T64, TAP, PRG, P00, LNX)
+- ✅ **Duplicate Handling**: Automatic versioning for duplicate game names
+- ✅ **Error Reporting**: Detailed logging of skipped games and errors
+
+## Experimental Features (GUI - Work in Progress)
+
+⚠️ **Warning:** The GUI is experimental and not recommended for large collections yet.
+
+- 🧪 Interactive interface with game preview
+- 🧪 Progress tracking and cancellation
+- 🧪 Metadata caching (may have bugs)
+- 🧪 Filtering by genre/language/publisher
+- 🧪 Selective organization with checkboxes
 
 ## Requirements
 
