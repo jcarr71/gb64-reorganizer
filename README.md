@@ -1,6 +1,6 @@
-# GameBase Game Organizer
+# GameBase64 Game Organizer
 
-A Python utility to organize retro game collections (Commodore 64, Amiga, etc.) from zip archives into a structured folder hierarchy based on metadata extracted from VERSION.NFO files.
+A Python utility to organize GameBase64 game collections (Commodore 64, Amiga, etc.) from zip archives into a structured folder hierarchy based on metadata extracted from VERSION.NFO files.
 
 ## Version Info
 

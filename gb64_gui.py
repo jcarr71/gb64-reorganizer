@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamebase Game Organizer - GUI Edition
+GameBase64 Game Organizer - GUI Edition
 
 Compact, efficient GUI for organizing games from zipped archives.
 
@@ -266,7 +266,7 @@ class GamebaseGameOrganizerGUI:
     
     def __init__(self, root):
         self.root = root
-        self.root.title("Gamebase Game Organizer (WIP - Experimental)")
+        self.root.title("GameBase64 Game Organizer (WIP - Experimental)")
         self.root.geometry("1250x750")
         
         self.source_dir = None

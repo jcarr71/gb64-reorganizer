@@ -1,8 +1,8 @@
-# Copilot Instructions - GameBase Game Organizer
+# Copilot Instructions - GameBase64 Game Organizer
 
 ## Project Overview
 
-A dual-interface Python tool (CLI + GUI) for organizing retro game collections from zip archives into structured folder hierarchies. The tool:
+A dual-interface Python tool (CLI + GUI) for organizing GameBase64 game collections from zip archives into structured folder hierarchies. The tool:
 - Extracts games from zipped archives (designed for GameBase collections: C64, Amiga, etc.)
 - Parses VERSION.NFO metadata files to extract 15+ fields (name, genre, publisher, year, credits, etc.)
 - Creates customizable folder structures using template placeholders

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Gamebase Game Organizer
+GameBase64 Game Organizer
 
-A utility to organize games from various gamebases (Commodore 64, Amiga, etc.)
+A utility to organize games from GameBase64 archives (Commodore 64, Amiga, etc.)
 from zipped archives into a structured folder hierarchy based on metadata
 extracted from VERSION.NFO files.
 
@@ -495,7 +495,7 @@ def main():
     then organizes all games in those directories.
     """
     print("\n" + "=" * 60)
-    print("GAMEBASE GAME ORGANIZER v1.2.0")
+    print("GAMEBASE64 GAME ORGANIZER v1.2.0")
     print("=" * 60)
     
     # Get directories from user
