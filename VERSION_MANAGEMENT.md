@@ -2,9 +2,9 @@
 
 ## Available Versions
 
-### v1.2.0 (Stable CLI - **RECOMMENDED**)
+### v1.3.0 (Current Stable CLI - **RECOMMENDED**)
 **Status:** Released and tagged on GitHub
-**Component:** CLI only (`gb64_reorganizer.py`)
+**Component:** CLI only (`gb64_reorganizer.py`) + GUI experimental (`gb64_gui.py`)
 **Features:**
 - ✅ Core game organizing from zip files
 - ✅ VERSION.NFO metadata extraction (15 fields)
@@ -14,21 +14,56 @@
   - `{published_year}`, `{publisher}`, `{developer}`
   - `{players}`, `{control}`, `{pal_ntsc}`
   - `{unique_id}`, `{coding}`, `{graphics}`, `{music}`, `{comment}`
-- ✅ **Path Sanitization Fix** - Handles slashes in metadata (e.g., "English \ Italian" → "English - Italian")
+- ✅ **Path Sanitization** - Handles slashes, brackets, and special characters in metadata
 - ✅ **Template Validation** - Helpful error messages for typos in field names
+- ✅ **English-Only Filter** - Process only English-language games
+- ✅ **Publisher Simplification** - Remove publisher subtitles with `--collapse-publishers`
+- ✅ **Keep Zipped Option** - Copy/move zip files without extracting
 - ✅ Interactive template prompt with examples
 - ✅ Multi-disk game file renaming
 - ✅ Copy/Move operations
+- ✅ Safe non-destructive defaults
+
+**New in v1.3.0:**
+- Fixed zip filename when using `--keep-zipped` (uses game name instead of genre)
+- Type safety improvements (None checks for publisher and language fields)
+- Comprehensive documentation updates
+
+**Command-Line Options:**
+```bash
+# Interactive mode
+python gb64_reorganizer.py
+
+# Quick mode
+python gb64_reorganizer.py "C:\Source" "C:\Dest"
+
+# With custom template
+python gb64_reorganizer.py "C:\Source" "C:\Dest" --template "{publisher}/{name}"
+
+# English games only
+python gb64_reorganizer.py "C:\Source" "C:\Dest" --english-only
+
+# Keep files zipped
+python gb64_reorganizer.py "C:\Source" "C:\Dest" --keep-zipped
+
+# Multiple options
+python gb64_reorganizer.py "C:\Source" "C:\Dest" --template "{publisher}/{name}" --english-only --collapse-publishers
+```
 
 **Example Templates:**
 ```
 {primary_genre}/{secondary_genre}/{language}/{name}  (default)
 {published_year}/{primary_genre}/{name}
 {publisher}/{name}
-{language}/{publisher}/{primary_genre}/{secondary_genre}
+{language}/{publisher}/{primary_genre}/{name}
 ```
 
-**Access:** `git checkout v1.2.0`
+**Access:** `git checkout v1.3.0` or current `main` branch
+
+---
+
+### v1.2.1 (Previous Release)
+**Status:** Superseded by v1.3.0
 
 ---
 
@@ -49,17 +84,31 @@
 - Large collections (30k+ files) not fully tested
 - UI may freeze on very large selections
 
-**Recommendation:** Use v1.2.0 CLI for production use
+**Recommendation:** Use v1.3.0 CLI for production use
 
 **Access:** Current `main` branch (not tagged)
 
 ---
 
-### v1.0.1 (Previous Release)
-**Status:** Superseded by v1.2.0
+### v1.2.1 (Previous Release)
+**Status:** Superseded by v1.3.0
+
+---
+
+### v1.2.0 (Previous Release)
+**Status:** Superseded by v1.2.1
 **Features:**
-- Template system (basic version)
-- Path issues with special characters
+- Template system
+- Path sanitization for special characters
+
+**Access:** `git checkout v1.2.0`
+
+---
+
+### v1.0.1 (Legacy)
+**Status:** Deprecated
+**Features:**
+- Original template system
 
 **Access:** `git checkout v1.0.1`
 
@@ -76,20 +125,33 @@
 
 ## How to Switch Versions
 
+### Check out latest version (1.3.0)
+```bash
+git checkout v1.3.0
+```
+
+### Check out version 1.2.1
+```bash
+git checkout v1.2.1
+```
+
+### Check out version 1.2.0
+```bash
+git checkout v1.2.0
+```
+
+### Check out version 1.0.1
+```bash
+git checkout v1.0.1
+```
+
 ### Check out version 1.0.0
-```powershell
+```bash
 git checkout v1.0.0
 ```
 
-### Check out version 1.0.1 (latest)
-```powershell
-git checkout v1.0.1
-# or
-git checkout main
-```
-
 ### View version history
-```powershell
+```bash
 git log --oneline --graph --all
 ```
 
@@ -102,28 +164,48 @@ git tag -l -n5
 
 ## GitHub Release Pages
 
-Both versions are available as GitHub Releases at:
+All versions are available as GitHub Releases at:
 https://github.com/jcarr71/gb64-reorganizer/releases
 
-- **v1.0.0** - Original stable release
-- **v1.0.1** - Latest with template system
+- **v1.3.0** - Current stable CLI with advanced options and bug fixes
+- **v1.2.1** - Previous stable release
+- **v1.0.1** - Legacy version with basic template system
+- **v1.0.0** - Original stable release with fixed structure
 
 ---
 
 ## Development Workflow
 
-### For version 1.0.1+ development:
+### For v1.3.0+ development:
 1. Develop on `main` branch
 2. When ready to release, commit changes: `git commit -m "..."`
 3. Create annotated tag: `git tag -a vX.X.X -m "Release notes"`
 4. Push to GitHub: `git push origin main --tags`
 
-### To keep 1.0.0 available:
-The v1.0.0 tag ensures the exact commit is preserved on GitHub and can be checked out anytime.
+### To keep all versions available:
+All version tags are preserved on GitHub and can be checked out anytime using `git checkout vX.X.X`.
 
 ---
 
 ## File Structure by Version
+
+### v1.3.0
+- `gb64_reorganizer.py` (with template system, English filter, publisher collapse, keep-zipped, improved type safety)
+- `gb64_gui.py` (experimental GUI with filtering and caching)
+- `.github/copilot-instructions.md` (developer documentation)
+- `.gitignore` (proper Git configuration)
+
+### v1.2.1
+- `gb64_reorganizer.py` (with template system)
+- `gb64_gui.py` (experimental GUI)
+- `.github/copilot-instructions.md`
+- `.gitignore`
+
+### v1.0.1
+- `gb64_reorganizer.py` (with template system)
+- `gb64_gui.py` (new GUI with template field)
+- `.github/copilot-instructions.md`
+- `.gitignore`
 
 ### v1.0.0
 - `gb64_reorganizer.py` (core organizer, no template system)

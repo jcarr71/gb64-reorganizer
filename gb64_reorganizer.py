@@ -366,7 +366,7 @@ class GamebaseOrganizer:
         
         return sanitized
     
-    def organize_games(self, move_files: bool = False, folder_template: str = "{primary_genre}/{secondary_genre}/{language}/{name}", english_only: bool = False, include_no_text: bool = False, collapse_publishers: bool = False) -> None:
+    def organize_games(self, move_files: bool = False, folder_template: str = "{primary_genre}/{secondary_genre}/{language}/{name}", english_only: bool = False, include_no_text: bool = False, collapse_publishers: bool = False, keep_zipped: bool = False) -> None:
         """
         Scan source directory and organize games into destination structure.
         
@@ -378,6 +378,7 @@ class GamebaseOrganizer:
             english_only: If True, only process games with 'English' in language field (case-insensitive)
             include_no_text: If True, include games with '(No Text)' when english_only is True
             collapse_publishers: If True, remove everything after ' - ' in publisher names
+            keep_zipped: If True, copy/move the zip file instead of extracting contents
         """
         if not self.source_root.exists():
             print(f"Error: Source directory '{self.source_root}' does not exist")
@@ -403,7 +404,7 @@ class GamebaseOrganizer:
         for zip_file in self.source_root.rglob('*.zip'):
             zip_count += 1
             self.games_found += 1
-            self._process_zip_file(zip_file, move_files, folder_template, english_only, include_no_text, collapse_publishers)
+            self._process_zip_file(zip_file, move_files, folder_template, english_only, include_no_text, collapse_publishers, keep_zipped)
         
         # Print summary
         print("-" * 60)
@@ -428,7 +429,7 @@ class GamebaseOrganizer:
         log_file.close()
         print(f"\nLog file saved to: {log_file_path}")
     
-    def _process_zip_file(self, zip_path: Path, move_files: bool, folder_template: str, english_only: bool = False, include_no_text: bool = False, collapse_publishers: bool = False) -> None:
+    def _process_zip_file(self, zip_path: Path, move_files: bool, folder_template: str, english_only: bool = False, include_no_text: bool = False, collapse_publishers: bool = False, keep_zipped: bool = False) -> None:
         """
         Process a zipped game file.
         
@@ -441,6 +442,7 @@ class GamebaseOrganizer:
             english_only: If True, skip games without 'English' in language field (case-insensitive)
             include_no_text: If True, include games with '(No Text)' when english_only is True
             collapse_publishers: If True, remove everything after ' - ' in publisher names
+            keep_zipped: If True, copy/move the zip file instead of extracting contents
         """
         # Extract zip to temporary location
         temp_dir = self.extract_zip_to_temp(zip_path)
@@ -466,15 +468,16 @@ class GamebaseOrganizer:
             # Collapse publisher name if requested (remove everything after / or \)
             if collapse_publishers and metadata.get('publisher'):
                 publisher = metadata['publisher']
-                # Only check for / and \ (separators in publisher names)
-                for separator in ['/', '\\']:
-                    if separator in publisher:
-                        metadata['publisher'] = publisher.split(separator)[0].strip()
-                        break
+                if publisher:  # Ensure publisher is not None
+                    # Only check for / and \ (separators in publisher names)
+                    for separator in ['/', '\\']:
+                        if separator in publisher:
+                            metadata['publisher'] = publisher.split(separator)[0].strip()
+                            break
             
             # Check English-only filter
             if english_only:
-                language = metadata.get('language', '')
+                language = metadata.get('language') or ''
                 # Case-insensitive check for English
                 has_english = 'english' in language.lower()
                 is_no_text = '(no text)' in language.lower()
@@ -484,33 +487,61 @@ class GamebaseOrganizer:
                     print(f"⚠ SKIP: {zip_path.stem} - Not English (Language: {language})")
                     return
             
-            # Get the actual game folder (parent of VERSION.NFO)
-            game_folder = nfo_file.parent
-            
-            # Rename disk files in the game folder
+            # Get game name for destination
             game_name = self.sanitize_folder_name(metadata.get('name') or zip_path.stem)
-            self.rename_disk_files(game_folder, game_name)
             
             # Create destination path using template
             dest_path = self.build_destination_path(folder_template, metadata, zip_path, self.destination_root)
             
-            # Add game name as an additional subfolder to store the game files
-            final_dest = dest_path / game_name
-            
-            # Check if destination already exists - if so, add version number
-            version = 2
-            while final_dest.exists():
-                versioned_name = f"{game_name} [v{version}]"
-                final_dest = dest_path / versioned_name
-                version += 1
-            
-            # Create destination directory and copy the game folder
-            final_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(game_folder, final_dest)
-            
-            self.games_moved += 1
-            print(f"✓ EXTRACTED: {zip_path.name}")
-            print(f"  → {final_dest.relative_to(self.destination_root)}")
+            if keep_zipped:
+                # Copy/move the zip file without extracting
+                # Always include game name in the zip filename
+                final_dest = dest_path / f"{game_name}.zip"
+                
+                # Check if destination already exists - if so, add version number
+                version = 2
+                while final_dest.exists():
+                    versioned_name = f"{game_name} [v{version}].zip"
+                    final_dest = dest_path / versioned_name
+                    version += 1
+                
+                # Create destination directory and copy/move the zip file
+                final_dest.parent.mkdir(parents=True, exist_ok=True)
+                
+                if move_files:
+                    shutil.move(str(zip_path), str(final_dest))
+                    operation = "MOVED"
+                else:
+                    shutil.copy2(str(zip_path), str(final_dest))
+                    operation = "COPIED"
+                
+                self.games_moved += 1
+                print(f"✓ {operation}: {zip_path.name}")
+                print(f"  → {final_dest.relative_to(self.destination_root)}")
+            else:
+                # Extract and organize (original behavior)
+                game_folder = nfo_file.parent
+                
+                # Rename disk files in the game folder
+                self.rename_disk_files(game_folder, game_name)
+                
+                # Add game name as an additional subfolder to store the game files
+                final_dest = dest_path / game_name
+                
+                # Check if destination already exists - if so, add version number
+                version = 2
+                while final_dest.exists():
+                    versioned_name = f"{game_name} [v{version}]"
+                    final_dest = dest_path / versioned_name
+                    version += 1
+                
+                # Create destination directory and copy the game folder
+                final_dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(game_folder, final_dest)
+                
+                self.games_moved += 1
+                print(f"✓ EXTRACTED: {zip_path.name}")
+                print(f"  → {final_dest.relative_to(self.destination_root)}")
         
         finally:
             # Clean up temporary directory
@@ -550,11 +581,13 @@ Examples:
                        help='Include (No Text) games when using --english-only')
     parser.add_argument('--collapse-publishers', action='store_true',
                        help='Remove text after dash in publisher names')
+    parser.add_argument('--keep-zipped', action='store_true',
+                       help='Copy/move zip files without extracting')
     
     args = parser.parse_args()
     
     print("\n" + "=" * 60)
-    print("GAMEBASE64 GAME ORGANIZER v1.2.1")
+    print("GAMEBASE64 GAME ORGANIZER v1.3.0")
     print("=" * 60)
     
     # Get directories - from args or interactive prompts
@@ -565,6 +598,7 @@ Examples:
         english_only = args.english_only
         include_no_text = args.include_no_text
         collapse_publishers = args.collapse_publishers
+        keep_zipped = args.keep_zipped
         
         print(f"\nSource: {source}")
         print(f"Destination: {destination}")
@@ -573,6 +607,8 @@ Examples:
             print(f"English filter: {'English + (No Text)' if include_no_text else 'English only'}")
         if collapse_publishers:
             print("Publisher collapse: Enabled")
+        if keep_zipped:
+            print("Keep zipped: Yes (files will not be extracted)")
     else:
         # Interactive mode
         source = input("\nEnter source directory (zipped games): ").strip()
@@ -619,10 +655,17 @@ Examples:
         
         if collapse_publishers:
             print("Publisher names will be collapsed (e.g., 'Activision - Games' → 'Activision')")
+        
+        # Ask about keeping files zipped
+        keep_zip = input("\nKeep files zipped (do not extract)? (y/n): ").strip().lower()
+        keep_zipped = keep_zip == 'y'
+        
+        if keep_zipped:
+            print("Files will remain zipped (no extraction)")
     
     # Create organizer and process games
     organizer = GamebaseOrganizer(source, destination)
-    organizer.organize_games(move_files=False, folder_template=template, english_only=english_only, include_no_text=include_no_text, collapse_publishers=collapse_publishers)
+    organizer.organize_games(move_files=False, folder_template=template, english_only=english_only, include_no_text=include_no_text, collapse_publishers=collapse_publishers, keep_zipped=keep_zipped)
 
 
 if __name__ == "__main__":
