@@ -36,3 +36,6 @@ organization_log.txt
 *.log
 RELEASE-INSTRUCTIONS.ps1
 create-release.ps1
+create-release-v*.ps1
+release_notes_v*.txt
+.gamebase_cache.json
