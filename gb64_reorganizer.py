@@ -6,6 +6,7 @@ A utility to organize games from GameBase64 archives (Commodore 64, Amiga, etc.)
 from zipped archives into a structured folder hierarchy based on metadata
 extracted from VERSION.NFO files.
 
+Version: 1.3.2
 Author: Jason Carr
 Date: January 2026
 """
@@ -492,53 +493,64 @@ class GamebaseOrganizer:
             
             # Create destination path using template
             dest_path = self.build_destination_path(folder_template, metadata, zip_path, self.destination_root)
-            
+
             if keep_zipped:
                 # Copy/move the zip file without extracting
                 # Always include game name in the zip filename
                 final_dest = dest_path / f"{game_name}.zip"
-                
+
                 # Check if destination already exists - if so, add version number
                 version = 2
                 while final_dest.exists():
                     versioned_name = f"{game_name} [v{version}].zip"
                     final_dest = dest_path / versioned_name
                     version += 1
-                
+
                 # Create destination directory and copy/move the zip file
                 final_dest.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 if move_files:
                     shutil.move(str(zip_path), str(final_dest))
                     operation = "MOVED"
                 else:
                     shutil.copy2(str(zip_path), str(final_dest))
                     operation = "COPIED"
-                
+
                 self.games_moved += 1
                 print(f"✓ {operation}: {zip_path.name}")
                 print(f"  → {final_dest.relative_to(self.destination_root)}")
             else:
                 # Extract and organize (original behavior)
                 game_folder = nfo_file.parent
-                
+
                 # Rename disk files in the game folder
                 self.rename_disk_files(game_folder, game_name)
-                
-                # Add game name as an additional subfolder to store the game files
-                final_dest = dest_path / game_name
-                
+
+                # Determine if template ends with {name} (or equivalent)
+                # If so, do NOT add extra game_name subfolder
+                template_stripped = folder_template.strip().replace(' ', '')
+                ends_with_name = template_stripped.endswith('{name}')
+
+                if ends_with_name:
+                    final_dest = dest_path
+                else:
+                    final_dest = dest_path / game_name
+
                 # Check if destination already exists - if so, add version number
                 version = 2
                 while final_dest.exists():
-                    versioned_name = f"{game_name} [v{version}]"
-                    final_dest = dest_path / versioned_name
+                    if ends_with_name:
+                        versioned_name = f"{game_name} [v{version}]"
+                        final_dest = dest_path.parent / versioned_name
+                    else:
+                        versioned_name = f"{game_name} [v{version}]"
+                        final_dest = dest_path / versioned_name
                     version += 1
-                
+
                 # Create destination directory and copy the game folder
                 final_dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(game_folder, final_dest)
-                
+
                 self.games_moved += 1
                 print(f"✓ EXTRACTED: {zip_path.name}")
                 print(f"  → {final_dest.relative_to(self.destination_root)}")
