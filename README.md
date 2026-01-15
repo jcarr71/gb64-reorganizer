@@ -4,12 +4,12 @@ A Python utility to organize GameBase64 game collections (Commodore 64, Amiga, e
 
 ## Version Info
 
-**Current Stable Release:** v1.3.1 (CLI with extended options)
+**Current Stable Release:** v1.3.2 (CLI with extended options)
 **GUI Status:** Work in Progress (Experimental)
 
 👉 **Recommended:** Use the CLI (`gb64_reorganizer.py`) for production use
 
-## Features (CLI - v1.3.1 Stable)
+## Features (CLI - v1.3.2 Stable)
 
 - ✅ **Automatic Organization**: Extracts games from zip files and organizes them into a clean folder structure
 - ✅ **Metadata-Based Sorting**: Extracts metadata from VERSION.NFO files (15 fields):

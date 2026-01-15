@@ -2,36 +2,17 @@
 
 ## Available Versions
 
-### v1.3.1 (Current Stable CLI - **RECOMMENDED**)
+
+### v1.3.2 (Latest Release - **RECOMMENDED**)
 **Status:** Released and tagged on GitHub
 **Component:** CLI only (`gb64_reorganizer.py`) + GUI experimental (`gb64_gui.py`)
 **Features:**
-- ✅ Core game organizing from zip files
-- ✅ VERSION.NFO metadata extraction (15 fields)
-- ✅ **Dynamic Template System** - Customize folder structure with placeholders
-- ✅ **15 Metadata Field Placeholders:**
-  - `{name}`, `{primary_genre}`, `{secondary_genre}`, `{language}`
-  - `{published_year}`, `{publisher}`, `{developer}`
-  - `{players}`, `{control}`, `{pal_ntsc}`
-  - `{unique_id}`, `{coding}`, `{graphics}`, `{music}`, `{comment}`
-- ✅ **Path Sanitization** - Handles slashes, brackets, and special characters in metadata
-- ✅ **Template Validation** - Helpful error messages for typos in field names
-- ✅ **English-Only Filter** - Process only English-language games
-- ✅ **Publisher Simplification** - Remove publisher subtitles with `--collapse-publishers`
-- ✅ **Keep Zipped Option** - Copy/move zip files without extracting
-- ✅ Interactive template prompt with examples
-- ✅ Multi-disk game file renaming
-- ✅ Copy/Move operations
-- ✅ Safe non-destructive defaults
+- ✅ All features from v1.3.1
+- ✅ Additional bug fixes and improvements
+- ✅ See release_notes_v1.3.2.txt for full details
 
-**New in v1.3.1:**
-- Fixed `{published_year}` placeholder to handle non-numeric years (replaces `?` with `x` for Windows compatibility)
-  - Example: "198?" → "198x"
-
-**New in v1.3.0:**
-- Fixed zip filename when using `--keep-zipped` (uses game name instead of genre)
-- Type safety improvements (None checks for publisher and language fields)
-- Comprehensive documentation updates
+**New in v1.3.2:**
+- See release_notes_v1.3.2.txt for the latest changes and fixes.
 
 **Command-Line Options:**
 ```bash
@@ -62,22 +43,27 @@ python gb64_reorganizer.py "C:\Source" "C:\Dest" --template "{publisher}/{name}"
 {language}/{publisher}/{primary_genre}/{name}
 ```
 
-**Access:** `git checkout v1.3.1` or current `main` branch
+**Access:** `git checkout v1.3.2` or current `main` branch
 
 ---
+
+
+### v1.3.1 (Previous Release)
+**Status:** Superseded by v1.3.2
+**Features:**
+- See release_notes_v1.3.1.txt for details.
+
+**Access:** `git checkout v1.3.1`
+
+---
+
 
 ### v1.3.0 (Previous Release)
 **Status:** Superseded by v1.3.1
 **Features:**
-- Fixed zip filename when using `--keep-zipped`
-- Type safety improvements
+- See release_notes_v1.3.0.txt for details.
 
 **Access:** `git checkout v1.3.0`
-
----
-
-### v1.2.1 (Previous Release)
-**Status:** Superseded by v1.3.0
 
 ---
 
@@ -103,6 +89,7 @@ python gb64_reorganizer.py "C:\Source" "C:\Dest" --template "{publisher}/{name}"
 **Access:** Current `main` branch (not tagged)
 
 ---
+
 
 ### v1.2.1 (Previous Release)
 **Status:** Superseded by v1.3.0
